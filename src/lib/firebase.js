@@ -4,17 +4,6 @@ import { getAuth } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { enableIndexedDbPersistence } from 'firebase/firestore';
 
-try {
-  enableIndexedDbPersistence(db);
-} catch (err) {
-  if (err.code === 'failed-precondition') {
-    console.warn('Persistencia offline deshabilitada (múltiples pestañas)');
-  } else if (err.code === 'unimplemented') {
-    console.warn('Persistencia no soportada en este navegador');
-  }
-}
-
-// Tu configuración de Firebase (obtén esto desde Firebase Console > Configuración del proyecto > SDK web)
 const firebaseConfig = {
   apiKey: "AIzaSyCrY1RF-81Eqq3qpzLvtzrjdFcj0624y68",
   authDomain: "inversiones-c4daf.firebaseapp.com",
@@ -28,3 +17,14 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
+
+// ✅ AHORA SÍ - db ya está definido
+try {
+  enableIndexedDbPersistence(db);
+} catch (err) {
+  if (err.code === 'failed-precondition') {
+    console.warn('Persistencia offline deshabilitada (múltiples pestañas)');
+  } else if (err.code === 'unimplemented') {
+    console.warn('Persistencia no soportada en este navegador');
+  }
+}

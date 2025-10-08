@@ -9,7 +9,6 @@ export function usePortfolio(userId) {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Si no hay userId, no hacer nada
     if (!userId) {
       setLoading(false);
       return;
@@ -23,7 +22,6 @@ export function usePortfolio(userId) {
         if (docSnap.exists()) {
           setPortfolio(docSnap.data());
         } else {
-          // Crear portfolio vacío
           const newPortfolio = {
             userId: userId,
             instruments: [],
@@ -42,39 +40,86 @@ export function usePortfolio(userId) {
     };
 
     loadPortfolio();
-  }, [userId]); // ✅ Solo depende del string userId
+  }, [userId]);
 
-  const upsertInstrument = async (instrument) => {
-    if (!userId || !portfolio) {
-      throw new Error('No se puede guardar: userId o portfolio no disponibles');
+  const upsertInstrument = async (instrumentData) => {
+    if (!userId) throw new Error('User ID is required');
+    if (!instrumentData?.name) throw new Error('Instrument must have a name');
+
+    const currentInstruments = portfolio?.instruments || [];
+    const existingIndex = currentInstruments.findIndex(inst => inst.name === instrumentData.name);
+
+    let updatedInstruments;
+
+    if (existingIndex >= 0) {
+      // Actualizar instrumento existente
+      const updatedInst = {
+        ...currentInstruments[existingIndex],
+        ...instrumentData,
+        currentValue: instrumentData.currentValue ?? currentInstruments[existingIndex].currentValue,
+        lastValuationDate: new Date()
+      };
+      updatedInstruments = [...currentInstruments];
+      updatedInstruments[existingIndex] = updatedInst;
+    } else {
+      // Crear nuevo instrumento
+      const newInstrument = {
+        ...instrumentData,
+        cashFlows: instrumentData.cashFlows || [],
+        valuations: instrumentData.valuations || [],
+        currentValue: instrumentData.currentValue || 0,
+        lastValuationDate: new Date()
+      };
+      updatedInstruments = [...currentInstruments, newInstrument];
     }
 
-    try {
-      const portfolioRef = doc(db, 'portfolios', userId);
-      const updatedInstruments = [...(portfolio.instruments || [])];
-      const existingIndex = updatedInstruments.findIndex(i => i.name === instrument.name);
+    const portfolioRef = doc(db, 'portfolios', userId);
+    await updateDoc(portfolioRef, {
+      instruments: updatedInstruments,
+      updatedAt: new Date()
+    });
 
-      if (existingIndex >= 0) {
-        updatedInstruments[existingIndex] = instrument;
-      } else {
-        updatedInstruments.push(instrument);
-      }
-
-      await updateDoc(portfolioRef, {
-        instruments: updatedInstruments,
-        updatedAt: new Date()
-      });
-
-      setPortfolio(prev => ({
-        ...prev,
-        instruments: updatedInstruments,
-        updatedAt: new Date()
-      }));
-    } catch (err) {
-      console.error('Error al guardar instrumento:', err);
-      throw err;
-    }
+    setPortfolio(prev => ({
+      ...prev,
+      instruments: updatedInstruments,
+      updatedAt: new Date()
+    }));
   };
 
-  return { portfolio, loading, error, upsertInstrument };
+  const addValuation = async (instrumentName, valuation) => {
+    if (!portfolio) throw new Error('Portfolio not loaded');
+    const inst = (portfolio.instruments || []).find(i => i.name === instrumentName);
+    if (!inst) throw new Error('Instrument not found');
+
+    const updatedInstrument = {
+      ...inst,
+      valuations: [...(inst.valuations || []), { id: Date.now().toString(), ...valuation }],
+      currentValue: valuation.value,
+      lastValuationDate: valuation.date
+    };
+
+    await upsertInstrument(updatedInstrument);
+  };
+
+  const addCashFlow = async (instrumentName, cashFlow) => {
+    if (!portfolio) throw new Error('Portfolio not loaded');
+    const inst = (portfolio.instruments || []).find(i => i.name === instrumentName);
+    if (!inst) throw new Error('Instrument not found');
+
+    const updatedInstrument = {
+      ...inst,
+      cashFlows: [...(inst.cashFlows || []), { id: Date.now().toString(), ...cashFlow }]
+    };
+
+    await upsertInstrument(updatedInstrument);
+  };
+
+  return { 
+    portfolio, 
+    loading, 
+    error, 
+    upsertInstrument,
+    addValuation,
+    addCashFlow 
+  };
 }
