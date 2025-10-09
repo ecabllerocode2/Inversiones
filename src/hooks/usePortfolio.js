@@ -42,6 +42,42 @@ export function usePortfolio(userId) {
     loadPortfolio();
   }, [userId]);
 
+  const deleteInstrument = async (instrumentName) => {
+    if (!userId) throw new Error('User ID is required');
+    if (!portfolio) throw new Error('Portfolio not loaded');
+
+    const updatedInstruments = (portfolio.instruments || []).filter(
+      inst => inst.name !== instrumentName
+    );
+
+    // Ejemplo con Firebase
+    const updateValuation = async (instrumentName, valuationId, data) => {
+      const instrumentRef = doc(db, 'portfolios', userId, 'instruments', instrumentName);
+      const valuationsRef = collection(instrumentRef, 'valuations');
+      await updateDoc(doc(valuationsRef, valuationId), data);
+    };
+
+    const deleteValuation = async (instrumentName, valuationId) => {
+      const instrumentRef = doc(db, 'portfolios', userId, 'instruments', instrumentName);
+      const valuationsRef = collection(instrumentRef, 'valuations');
+      await deleteDoc(doc(valuationsRef, valuationId));
+    };
+
+    // Similar para cash flows...
+
+    const portfolioRef = doc(db, 'portfolios', userId);
+    await updateDoc(portfolioRef, {
+      instruments: updatedInstruments,
+      updatedAt: new Date()
+    });
+
+    setPortfolio(prev => ({
+      ...prev,
+      instruments: updatedInstruments,
+      updatedAt: new Date()
+    }));
+  };
+
   const upsertInstrument = async (instrumentData) => {
     if (!userId) throw new Error('User ID is required');
     if (!instrumentData?.name) throw new Error('Instrument must have a name');
@@ -114,12 +150,13 @@ export function usePortfolio(userId) {
     await upsertInstrument(updatedInstrument);
   };
 
-  return { 
-    portfolio, 
-    loading, 
-    error, 
+  return {
+    portfolio,
+    loading,
+    error,
     upsertInstrument,
     addValuation,
-    addCashFlow 
+    addCashFlow,
+    deleteInstrument
   };
 }

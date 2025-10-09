@@ -1,6 +1,15 @@
 // src/pages/Dashboard.jsx
 import { useState, useMemo } from 'react';
-import { format, startOfMonth, endOfMonth, startOfYear, endOfYear, subDays, isWithinInterval, parseISO } from 'date-fns';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  startOfYear,
+  endOfYear,
+  subDays,
+  isWithinInterval,
+  parseISO
+} from 'date-fns';
 import { usePortfolio } from '../hooks/usePortfolio.js';
 import DashboardHero from '../components/DashboardHero.jsx';
 import DateFilter from '../components/DateFilter.jsx';
@@ -11,14 +20,22 @@ import EditInstrumentModal from '../components/EditInstrumentModal.jsx';
 import InstrumentActionsModal from '../components/InstrumentActionsModal.jsx';
 
 export default function Dashboard({ userId }) {
-  const { portfolio, loading, error, upsertInstrument, addValuation, addCashFlow } = usePortfolio(userId);
-  
+  const {
+    portfolio,
+    loading,
+    error,
+    upsertInstrument,
+    addValuation,
+    addCashFlow,
+    deleteInstrument
+  } = usePortfolio(userId);
+
   // Estados para modales
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isActionsModalOpen, setIsActionsModalOpen] = useState(false);
   const [editingInstrument, setEditingInstrument] = useState(null);
   const [selectedInstrument, setSelectedInstrument] = useState(null);
-  
+
   // Estados para filtros de fecha
   const [filterType, setFilterType] = useState('all');
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'));
@@ -26,20 +43,31 @@ export default function Dashboard({ userId }) {
   const [customStartDate, setCustomStartDate] = useState('');
   const [customEndDate, setCustomEndDate] = useState('');
 
+  // Helper seguro para parsear fechas
+  const safeParseISO = (dateStr) => {
+    if (!dateStr) return null;
+    const parsed = parseISO(dateStr);
+    return isNaN(parsed.getTime()) ? null : parsed;
+  };
+
   // Calcular rango de fechas según filtro
   const dateRange = useMemo(() => {
     const now = new Date();
-    
+
     switch (filterType) {
       case 'month': {
-        const monthDate = parseISO(selectedMonth + '-01');
+        const dateStr = selectedMonth ? selectedMonth + '-01' : null;
+        const monthDate = safeParseISO(dateStr);
+        if (!monthDate) return null;
         return {
           start: startOfMonth(monthDate),
           end: endOfMonth(monthDate)
         };
       }
       case 'year': {
-        const yearDate = parseISO(selectedYear + '-01-01');
+        const dateStr = selectedYear ? selectedYear + '-01-01' : null;
+        const yearDate = safeParseISO(dateStr);
+        if (!yearDate) return null;
         return {
           start: startOfYear(yearDate),
           end: endOfYear(yearDate)
@@ -52,10 +80,10 @@ export default function Dashboard({ userId }) {
         };
       case 'custom':
         if (customStartDate && customEndDate) {
-          return {
-            start: parseISO(customStartDate),
-            end: parseISO(customEndDate)
-          };
+          const start = safeParseISO(customStartDate);
+          const end = safeParseISO(customEndDate);
+          if (!start || !end) return null;
+          return { start, end };
         }
         return null;
       default:
@@ -77,12 +105,16 @@ export default function Dashboard({ userId }) {
 
     instruments.forEach(inst => {
       (inst.cashFlows || []).forEach(cf => {
+        // Validar datos mínimos
+        if (!cf?.type || typeof cf.amount !== 'number' || !cf.date) return;
+
         const cfDate = new Date(cf.date);
-        
+        if (isNaN(cfDate)) return; // Fecha inválida
+
         // Totales históricos
         if (cf.type === 'deposit') totalDeposits += cf.amount;
         if (cf.type === 'withdrawal') totalWithdrawals += cf.amount;
-        
+
         // Totales filtrados por fecha
         if (dateRange && isWithinInterval(cfDate, dateRange)) {
           if (cf.type === 'deposit') filteredDeposits += cf.amount;
@@ -92,7 +124,7 @@ export default function Dashboard({ userId }) {
     });
 
     const totalInvested = totalDeposits - totalWithdrawals;
-    const currentValue = instruments.reduce((sum, i) => sum + (i.currentValue || 0), 0);
+    const currentValue = instruments.reduce((sum, i) => sum + (typeof i.currentValue === 'number' ? i.currentValue : 0), 0);
     const gain = currentValue - totalInvested;
     const yieldPct = totalInvested > 0 ? (gain / totalInvested) * 100 : 0;
 
@@ -128,15 +160,99 @@ export default function Dashboard({ userId }) {
     }
   };
 
+  // Dentro de Dashboard.jsx, reemplaza handleSaveAction por esto:
+
   const handleSaveAction = async (actionData) => {
     if (!selectedInstrument) return;
 
     try {
-      if (actionData.type === 'valuation') {
-        await addValuation(selectedInstrument.name, actionData.data);
-      } else if (actionData.type === 'cashflow') {
-        await addCashFlow(selectedInstrument.name, actionData.data);
+      const currentInstruments = Array.isArray(portfolio?.instruments) ? portfolio.instruments : [];
+      const currentInst = currentInstruments.find(i => i.name === selectedInstrument.name);
+
+      if (!currentInst) {
+        throw new Error('Instrumento no encontrado');
       }
+
+      if (actionData.type === 'valuation') {
+        const valuations = [...(currentInst.valuations || [])];
+        const newCurrentValue = parseFloat(actionData.data.value);
+
+        if (actionData.data.id) {
+          // Editar valuación existente
+          const index = valuations.findIndex(v => v.id === actionData.data.id);
+          if (index >= 0) {
+            valuations[index] = {
+              ...valuations[index],
+              date: actionData.data.date,
+              value: newCurrentValue
+            };
+          }
+        } else {
+          // Nueva valuación
+          valuations.push({
+            id: Date.now().toString(),
+            date: actionData.data.date,
+            value: newCurrentValue
+          });
+        }
+
+        await upsertInstrument({
+          ...currentInst,
+          valuations,
+          currentValue: newCurrentValue,
+          lastValuationDate: actionData.data.date
+        });
+
+      } else if (actionData.type === 'cashflow') {
+        const cashFlows = [...(currentInst.cashFlows || [])];
+
+        if (actionData.data.id) {
+          // Editar flujo existente
+          const index = cashFlows.findIndex(cf => cf.id === actionData.data.id);
+          if (index >= 0) {
+            cashFlows[index] = {
+              ...cashFlows[index],
+              date: actionData.data.date,
+              amount: parseFloat(actionData.data.amount),
+              type: actionData.data.type
+            };
+          }
+        } else {
+          // Nuevo flujo
+          cashFlows.push({
+            id: Date.now().toString(),
+            date: actionData.data.date,
+            amount: parseFloat(actionData.data.amount),
+            type: actionData.data.type
+          });
+        }
+
+        await upsertInstrument({
+          ...currentInst,
+          cashFlows
+        });
+
+      } else if (actionData.type === 'deleteValuation') {
+        const updatedValuations = (currentInst.valuations || []).filter(v => v.id !== actionData.data.id);
+        const latestValuation = updatedValuations.reduce((latest, v) =>
+          !latest || new Date(v.date) > new Date(latest.date) ? v : latest, null
+        );
+
+        await upsertInstrument({
+          ...currentInst,
+          valuations: updatedValuations,
+          currentValue: latestValuation ? latestValuation.value : 0,
+          lastValuationDate: latestValuation ? latestValuation.date : null
+        });
+
+      } else if (actionData.type === 'deleteCashFlow') {
+        const updatedCashFlows = (currentInst.cashFlows || []).filter(cf => cf.id !== actionData.data.id);
+        await upsertInstrument({
+          ...currentInst,
+          cashFlows: updatedCashFlows
+        });
+      }
+
       setIsActionsModalOpen(false);
       setSelectedInstrument(null);
     } catch (err) {
@@ -147,10 +263,7 @@ export default function Dashboard({ userId }) {
 
   const handleDeleteInstrument = async (instrument) => {
     try {
-      const updatedInstruments = instruments.filter(i => i.name !== instrument.name);
-      await upsertInstrument({ 
-        instruments: updatedInstruments 
-      });
+      await deleteInstrument(instrument.name);
     } catch (err) {
       console.error('Error al eliminar instrumento:', err);
       alert('Error al eliminar el instrumento. Por favor intenta de nuevo.');
@@ -188,7 +301,7 @@ export default function Dashboard({ userId }) {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Hero Section */}
+      {/* Hero Section 
       <DashboardHero
         totalInvested={stats.totalInvested}
         currentValue={stats.currentValue}
@@ -230,11 +343,15 @@ export default function Dashboard({ userId }) {
         onOpenActions={handleOpenActionsModal}
       />
 
+
       {/* Gráficas */}
-      <ChartSection
-        instruments={instruments}
-        dateRange={dateRange}
-      />
+      {instruments.length > 0 && (
+        <ChartSection
+          instruments={instruments}
+          dateRange={dateRange}
+        />
+      )}
+
 
       {/* Modal de edición */}
       {isEditModalOpen && (

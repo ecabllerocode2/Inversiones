@@ -1,38 +1,107 @@
 // src/components/ChartSection.jsx
+import React from 'react';
 import { LineChart, Line, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { TrendingUp, PieChart as PieChartIcon, BarChart3, Activity } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 
+// Helper seguro para fechas
+const formatDateSafe = (dateInput, formatStr = 'yyyy-MM-dd') => {
+  if (!dateInput) return null;
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return null;
+  return format(date, formatStr, { locale: es });
+};
+
+function generateEvolutionData(instruments, dateRange) {
+  const allDates = new Set();
+  
+  instruments.forEach(inst => {
+    (inst.valuations || []).forEach(v => {
+      if (!v?.date || typeof v.value !== 'number') return;
+      
+      const formattedDate = formatDateSafe(v.date, 'yyyy-MM-dd');
+      if (!formattedDate) return;
+      
+      if (dateRange) {
+        const vDate = new Date(v.date);
+        if (isNaN(vDate.getTime())) return;
+        if (vDate >= dateRange.start && vDate <= dateRange.end) {
+          allDates.add(formattedDate);
+        }
+      } else {
+        allDates.add(formattedDate);
+      }
+    });
+  });
+
+  if (allDates.size === 0) return [];
+
+  const sortedDates = Array.from(allDates).sort();
+  
+  return sortedDates.map(dateStr => {
+    const displayDate = formatDateSafe(dateStr, 'dd/MMM') || dateStr;
+    const point = { date: displayDate };
+    let total = 0;
+    
+    instruments.forEach(inst => {
+      if (!inst || typeof inst.name !== 'string' || !inst.name.trim()) return;
+      
+      const valuationsUpToDate = (inst.valuations || [])
+        .filter(v => {
+          if (!v?.date || typeof v.value !== 'number') return false;
+          const vFormatted = formatDateSafe(v.date, 'yyyy-MM-dd');
+          return vFormatted && vFormatted <= dateStr;
+        })
+        .sort((a, b) => new Date(b.date) - new Date(a.date));
+      
+      if (valuationsUpToDate.length > 0) {
+        const value = valuationsUpToDate[0].value;
+        point[inst.name] = value;
+        total += value;
+      }
+    });
+    
+    point.Total = total;
+    return point;
+  });
+}
+
 export default function ChartSection({ instruments, dateRange }) {
-  if (!instruments || instruments.length === 0) {
+  // Filtrar instrumentos válidos
+  const validInstruments = (instruments || []).filter(
+    inst => inst && typeof inst.name === 'string' && inst.name.trim()
+  );
+
+  if (validInstruments.length === 0) {
     return null;
   }
 
-  // Datos para gráfica de evolución temporal
-  const evolutionData = generateEvolutionData(instruments, dateRange);
+  const evolutionData = generateEvolutionData(validInstruments, dateRange);
   
-  // Datos para gráfica de distribución
-  const distributionData = instruments.map(inst => ({
+  const distributionData = validInstruments.map(inst => ({
     name: inst.name,
-    value: inst.currentValue || 0
+    value: typeof inst.currentValue === 'number' ? inst.currentValue : 0
   })).filter(item => item.value > 0);
 
-  // Datos para gráfica de depósitos vs valor
-  const depositsVsValueData = instruments.map(inst => {
+  const depositsVsValueData = validInstruments.map(inst => {
     const totalDeposits = (inst.cashFlows || [])
-      .filter(cf => cf.type === 'deposit')
+      .filter(cf => cf.type === 'deposit' && typeof cf.amount === 'number')
       .reduce((sum, cf) => sum + cf.amount, 0);
     
     const totalWithdrawals = (inst.cashFlows || [])
-      .filter(cf => cf.type === 'withdrawal')
+      .filter(cf => cf.type === 'withdrawal' && typeof cf.amount === 'number')
       .reduce((sum, cf) => sum + cf.amount, 0);
     
+    const netInvested = totalDeposits - totalWithdrawals;
+    const currentValue = typeof inst.currentValue === 'number' ? inst.currentValue : 0;
+    const gain = currentValue - netInvested;
+
     return {
       name: inst.name,
-      invertido: totalDeposits - totalWithdrawals,
-      valorActual: inst.currentValue || 0,
-      ganancia: (inst.currentValue || 0) - (totalDeposits - totalWithdrawals)
+      invertido: netInvested,
+      valorActual: currentValue,
+      ganancia: gain
     };
   }).filter(item => item.invertido > 0);
 
@@ -73,15 +142,13 @@ export default function ChartSection({ instruments, dateRange }) {
                   borderRadius: '8px',
                   boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                 }}
-                formatter={(value) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
+                formatter={(value) => `$${Number(value).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
               />
-              <Legend 
-                wrapperStyle={{ paddingTop: '20px' }}
-                iconType="line"
-              />
-              {instruments.map((inst, idx) => (
+              <Legend wrapperStyle={{ paddingTop: '20px' }} iconType="line" />
+              
+              {validInstruments.map((inst, idx) => (
                 <Line 
-                  key={inst.id || inst.name}
+                  key={inst.name}
                   type="monotone" 
                   dataKey={inst.name} 
                   stroke={COLORS[idx % COLORS.length]}
@@ -140,14 +207,14 @@ export default function ChartSection({ instruments, dateRange }) {
                     borderRadius: '8px',
                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                   }}
-                  formatter={(value) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
+                  formatter={(value) => `$${Number(value).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
                 />
               </PieChart>
             </ResponsiveContainer>
           </div>
         )}
 
-        {/* Gráfica de Comparación: Invertido vs Valor Actual */}
+        {/* Gráfica de Comparación */}
         {depositsVsValueData.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm p-6">
             <div className="flex items-center gap-2 mb-6">
@@ -163,11 +230,7 @@ export default function ChartSection({ instruments, dateRange }) {
             <ResponsiveContainer width="100%" height={350}>
               <BarChart data={depositsVsValueData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="name" 
-                  tick={{ fontSize: 12 }}
-                  stroke="#6b7280"
-                />
+                <XAxis dataKey="name" tick={{ fontSize: 12 }} stroke="#6b7280" />
                 <YAxis 
                   tick={{ fontSize: 12 }}
                   stroke="#6b7280"
@@ -180,7 +243,7 @@ export default function ChartSection({ instruments, dateRange }) {
                     borderRadius: '8px',
                     boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                   }}
-                  formatter={(value) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
+                  formatter={(value) => `$${Number(value).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
                 />
                 <Legend />
                 <Bar dataKey="invertido" name="Invertido" fill="#3b82f6" radius={[8, 8, 0, 0]} />
@@ -191,7 +254,7 @@ export default function ChartSection({ instruments, dateRange }) {
         )}
       </div>
 
-      {/* Gráfica de Rendimiento por Instrumento */}
+      {/* Gráfica de Rendimiento */}
       {depositsVsValueData.length > 0 && (
         <div className="bg-white rounded-xl shadow-sm p-6">
           <div className="flex items-center gap-2 mb-6">
@@ -227,7 +290,7 @@ export default function ChartSection({ instruments, dateRange }) {
                   borderRadius: '8px',
                   boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'
                 }}
-                formatter={(value) => `$${value.toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
+                formatter={(value) => `$${Number(value).toLocaleString('es-MX', { minimumFractionDigits: 2 })}`}
               />
               <Bar 
                 dataKey="ganancia" 
@@ -247,55 +310,4 @@ export default function ChartSection({ instruments, dateRange }) {
       )}
     </div>
   );
-}
-
-// Función auxiliar para generar datos de evolución temporal
-function generateEvolutionData(instruments, dateRange) {
-  const allDates = new Set();
-  
-  // Recolectar todas las fechas de valuaciones
-  instruments.forEach(inst => {
-    (inst.valuations || []).forEach(v => {
-      const dateStr = format(new Date(v.date), 'yyyy-MM-dd');
-      
-      // Si hay filtro de fecha, solo incluir fechas dentro del rango
-      if (dateRange) {
-        const vDate = new Date(v.date);
-        if (vDate >= dateRange.start && vDate <= dateRange.end) {
-          allDates.add(dateStr);
-        }
-      } else {
-        allDates.add(dateStr);
-      }
-    });
-  });
-
-  if (allDates.size === 0) return [];
-
-  // Ordenar fechas
-  const sortedDates = Array.from(allDates).sort();
-  
-  // Construir datos para cada fecha
-  return sortedDates.map(dateStr => {
-    const point = { 
-      date: format(new Date(dateStr), 'dd/MMM', { locale: es })
-    };
-    let total = 0;
-    
-    instruments.forEach(inst => {
-      // Buscar valuación en esta fecha o la más reciente anterior
-      const valuationsUpToDate = (inst.valuations || [])
-        .filter(v => format(new Date(v.date), 'yyyy-MM-dd') <= dateStr)
-        .sort((a, b) => new Date(b.date) - new Date(a.date));
-      
-      if (valuationsUpToDate.length > 0) {
-        const value = valuationsUpToDate[0].value;
-        point[inst.name] = value;
-        total += value;
-      }
-    });
-    
-    point.Total = total;
-    return point;
-  });
 }

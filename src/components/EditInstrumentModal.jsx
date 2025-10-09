@@ -58,8 +58,8 @@ export default function EditInstrumentModal({ instrument, onSave, onClose }) {
     const instrumentData = {
       name: formData.name.trim(),
       initialDeposit: parseFloat(formData.initialDeposit),
-      currentValue: formData.currentValue 
-        ? parseFloat(formData.currentValue) 
+      currentValue: formData.currentValue
+        ? parseFloat(formData.currentValue)
         : parseFloat(formData.initialDeposit),
       category: formData.category,
       broker: formData.broker.trim(),
@@ -79,8 +79,8 @@ export default function EditInstrumentModal({ instrument, onSave, onClose }) {
         {
           id: Date.now().toString(),
           date: new Date(),
-          value: formData.currentValue 
-            ? parseFloat(formData.currentValue) 
+          value: formData.currentValue
+            ? parseFloat(formData.currentValue)
             : parseFloat(formData.initialDeposit)
         }
       ]
@@ -95,7 +95,7 @@ export default function EditInstrumentModal({ instrument, onSave, onClose }) {
       ...prev,
       [name]: value
     }));
-    
+
     // Limpiar error del campo cuando el usuario empieza a escribir
     if (errors[name]) {
       setErrors(prev => ({
@@ -133,9 +133,8 @@ export default function EditInstrumentModal({ instrument, onSave, onClose }) {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                errors.name ? 'border-red-500' : 'border-gray-300'
-              }`}
+              className={`w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.name ? 'border-red-500' : 'border-gray-300'
+                }`}
               placeholder="Ej: CETES, Fondo de inversión, Acciones Apple"
               disabled={!!instrument}
             />
@@ -166,6 +165,9 @@ export default function EditInstrumentModal({ instrument, onSave, onClose }) {
               <option value="crypto">Criptomonedas</option>
               <option value="real-estate">Bienes raíces</option>
               <option value="commodities">Commodities</option>
+              <option value="SOFIPO">SOFIPO</option>
+              <option value="Liquidez/Ahorro">Lquidez/Ahorro</option>
+              <option value="Crowdfunding">Crowdfunding</option>
               <option value="other">Otro</option>
             </select>
           </div>
@@ -184,9 +186,8 @@ export default function EditInstrumentModal({ instrument, onSave, onClose }) {
                   value={formData.initialDeposit}
                   onChange={handleChange}
                   step="0.01"
-                  className={`w-full pl-8 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.initialDeposit ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full pl-8 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.initialDeposit ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="0.00"
                   disabled={!!instrument}
                 />
@@ -214,9 +215,8 @@ export default function EditInstrumentModal({ instrument, onSave, onClose }) {
                   value={formData.currentValue}
                   onChange={handleChange}
                   step="0.01"
-                  className={`w-full pl-8 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
-                    errors.currentValue ? 'border-red-500' : 'border-gray-300'
-                  }`}
+                  className={`w-full pl-8 pr-3 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent ${errors.currentValue ? 'border-red-500' : 'border-gray-300'
+                    }`}
                   placeholder="0.00"
                 />
               </div>

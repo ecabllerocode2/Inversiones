@@ -59,11 +59,11 @@ function InstrumentCard({ instrument, onEdit, onDelete, onOpenActions }) {
   const totalDeposits = (instrument.cashFlows || [])
     .filter(cf => cf.type === 'deposit')
     .reduce((sum, cf) => sum + cf.amount, 0);
-  
+
   const totalWithdrawals = (instrument.cashFlows || [])
     .filter(cf => cf.type === 'withdrawal')
     .reduce((sum, cf) => sum + cf.amount, 0);
-  
+
   const netInvested = totalDeposits - totalWithdrawals;
   const currentValue = instrument.currentValue || 0;
   const gain = currentValue - netInvested;
@@ -81,7 +81,7 @@ function InstrumentCard({ instrument, onEdit, onDelete, onOpenActions }) {
   };
 
   const category = categories[instrument.category] || categories.other;
-  
+
   const colorClasses = {
     blue: 'bg-blue-100 text-blue-700 border-blue-200',
     green: 'bg-green-100 text-green-700 border-green-200',
@@ -105,13 +105,13 @@ function InstrumentCard({ instrument, onEdit, onDelete, onOpenActions }) {
               {category.icon} {category.label}
             </span>
           </div>
-          
+
           {instrument.broker && (
             <p className="text-sm text-gray-600">
               📍 {instrument.broker}
             </p>
           )}
-          
+
           {instrument.description && (
             <p className="text-sm text-gray-500 mt-1">
               {instrument.description}
@@ -128,21 +128,21 @@ function InstrumentCard({ instrument, onEdit, onDelete, onOpenActions }) {
             ${netInvested.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
           </p>
         </div>
-        
+
         <div>
           <p className="text-xs text-gray-600 mb-1">Valor actual</p>
           <p className="text-base font-bold text-blue-600">
             ${currentValue.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
           </p>
         </div>
-        
+
         <div>
           <p className="text-xs text-gray-600 mb-1">Ganancia/Pérdida</p>
           <p className={`text-base font-bold ${gain >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {gain >= 0 ? '+' : '-'}${Math.abs(gain).toLocaleString('es-MX', { minimumFractionDigits: 2 })}
           </p>
         </div>
-        
+
         <div>
           <p className="text-xs text-gray-600 mb-1">Rendimiento</p>
           <div className="flex items-center gap-1">
@@ -166,7 +166,7 @@ function InstrumentCard({ instrument, onEdit, onDelete, onOpenActions }) {
             ${totalDeposits.toLocaleString('es-MX')}
           </span>
         </div>
-        
+
         {totalWithdrawals > 0 && (
           <div className="flex items-center gap-1">
             <span>💸 Retiros:</span>
@@ -175,19 +175,24 @@ function InstrumentCard({ instrument, onEdit, onDelete, onOpenActions }) {
             </span>
           </div>
         )}
-        
+
         <div className="flex items-center gap-1">
           <span>📊 Valuaciones:</span>
           <span className="font-semibold">
             {(instrument.valuations || []).length}
           </span>
         </div>
-        
+
         {instrument.lastValuationDate && (
           <div className="flex items-center gap-1">
             <span>📅 Última valuación:</span>
             <span className="font-semibold">
-              {format(new Date(instrument.lastValuationDate), 'dd/MMM/yyyy', { locale: es })}
+              {(() => {
+                const date = new Date(instrument.lastValuationDate);
+                return isNaN(date.getTime())
+                  ? 'Fecha inválida'
+                  : format(date, 'dd/MMM/yyyy', { locale: es });
+              })()}
             </span>
           </div>
         )}
@@ -202,7 +207,7 @@ function InstrumentCard({ instrument, onEdit, onDelete, onOpenActions }) {
           <Activity size={16} />
           Acciones
         </button>
-        
+
         <button
           onClick={() => onEdit(instrument)}
           className="px-4 py-2.5 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 font-medium flex items-center gap-2 transition"
@@ -210,7 +215,7 @@ function InstrumentCard({ instrument, onEdit, onDelete, onOpenActions }) {
           <Edit size={16} />
           Editar
         </button>
-        
+
         {onDelete && (
           <button
             onClick={() => {
