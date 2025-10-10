@@ -37,6 +37,14 @@ export default function InstrumentsList({ instruments, onEdit, onDelete, onOpenA
             {instruments.length} {instruments.length === 1 ? 'instrumento' : 'instrumentos'} en tu portafolio
           </p>
         </div>
+        <div>
+          <button
+            onClick={() => onEdit(null)}
+            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium"
+          >
+            + Agregar instrumento
+          </button>
+        </div>
       </div>
 
       <div className="space-y-4">
