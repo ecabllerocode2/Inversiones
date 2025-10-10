@@ -103,8 +103,8 @@ export default function StatsCards({
           {/* Capital invertido */}
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
             <div>
-              <p className="text-sm font-medium text-gray-600">Capital invertido</p>
-              <p className="text-xs text-gray-500 mt-0.5">Base de cálculo</p>
+              <p className="text-sm font-medium text-gray-600">Capital invertido neto</p>
+              <p className="text-xs text-gray-500 mt-0.5">Máximo entre 0 y (Depósitos - Retiros)</p>
             </div>
             <div className="text-right">
               <p className="text-lg font-bold text-gray-800">
@@ -133,7 +133,7 @@ export default function StatsCards({
                 {gain >= 0 ? 'Ganancia' : 'Pérdida'}
               </p>
               <p className="text-xs text-gray-500 mt-0.5">
-                Valor actual - Capital invertido
+                Valor actual - Capital invertido neto
               </p>
             </div>
             <div className="text-right">
@@ -151,7 +151,7 @@ export default function StatsCards({
               <div>
                 <p className="text-sm font-semibold text-gray-700">ROI (Return on Investment)</p>
                 <p className="text-xs text-gray-500 mt-0.5">
-                  Rendimiento porcentual
+                  Rendimiento porcentual sobre capital invertido
                 </p>
               </div>
               <div className="text-right">

@@ -123,9 +123,16 @@ export default function Dashboard({ userId }) {
       });
     });
 
-    const totalInvested = totalDeposits - totalWithdrawals;
+    // ✅ Capital invertido neto: nunca negativo
+    const totalInvested = Math.max(0, totalDeposits - totalWithdrawals);
+
+    // Valor actual total
     const currentValue = instruments.reduce((sum, i) => sum + (typeof i.currentValue === 'number' ? i.currentValue : 0), 0);
+
+    // Ganancia = valor actual - capital invertido neto
     const gain = currentValue - totalInvested;
+
+    // ROI solo si hay capital invertido
     const yieldPct = totalInvested > 0 ? (gain / totalInvested) * 100 : 0;
 
     return {
@@ -159,8 +166,6 @@ export default function Dashboard({ userId }) {
       alert('Error al guardar el instrumento. Por favor intenta de nuevo.');
     }
   };
-
-  // Dentro de Dashboard.jsx, reemplaza handleSaveAction por esto:
 
   const handleSaveAction = async (actionData) => {
     if (!selectedInstrument) return;
@@ -227,10 +232,30 @@ export default function Dashboard({ userId }) {
           });
         }
 
+        // ✅ Actualizar el instrumento con los nuevos flujos
+        // Recalcular totales
+        const totalDeposited = cashFlows
+          .filter(cf => cf.type === 'deposit')
+          .reduce((sum, cf) => sum + cf.amount, 0);
+        const totalWithdrawn = cashFlows
+          .filter(cf => cf.type === 'withdrawal')
+          .reduce((sum, cf) => sum + cf.amount, 0);
+
+        // Nuevo valor actual: si se retiró todo, queda en 0
+        const remaining = Math.max(0, currentInst.currentValue - (actionData.data.type === 'withdrawal' ? actionData.data.amount : 0));
+        const newCurrentValue = remaining === 0 ? 0 : currentInst.currentValue;
+
+        // Actualiza el instrumento completo
         await upsertInstrument({
           ...currentInst,
-          cashFlows
+          cashFlows,
+          totalDeposited,
+          totalWithdrawn,
+          netInvested: Math.max(0, totalDeposited - totalWithdrawn),
+          currentValue: newCurrentValue,
+          lastValuationDate: new Date().toISOString()
         });
+
 
       } else if (actionData.type === 'deleteValuation') {
         const updatedValuations = (currentInst.valuations || []).filter(v => v.id !== actionData.data.id);
@@ -301,7 +326,7 @@ export default function Dashboard({ userId }) {
 
   return (
     <div className="p-6 max-w-7xl mx-auto">
-      {/* Hero Section 
+      {/* Hero Section */}
       <DashboardHero
         totalInvested={stats.totalInvested}
         currentValue={stats.currentValue}
@@ -343,7 +368,6 @@ export default function Dashboard({ userId }) {
         onOpenActions={handleOpenActionsModal}
       />
 
-
       {/* Gráficas */}
       {instruments.length > 0 && (
         <ChartSection
@@ -351,7 +375,6 @@ export default function Dashboard({ userId }) {
           dateRange={dateRange}
         />
       )}
-
 
       {/* Modal de edición */}
       {isEditModalOpen && (

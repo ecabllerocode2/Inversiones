@@ -50,21 +50,6 @@ export function usePortfolio(userId) {
       inst => inst.name !== instrumentName
     );
 
-    // Ejemplo con Firebase
-    const updateValuation = async (instrumentName, valuationId, data) => {
-      const instrumentRef = doc(db, 'portfolios', userId, 'instruments', instrumentName);
-      const valuationsRef = collection(instrumentRef, 'valuations');
-      await updateDoc(doc(valuationsRef, valuationId), data);
-    };
-
-    const deleteValuation = async (instrumentName, valuationId) => {
-      const instrumentRef = doc(db, 'portfolios', userId, 'instruments', instrumentName);
-      const valuationsRef = collection(instrumentRef, 'valuations');
-      await deleteDoc(doc(valuationsRef, valuationId));
-    };
-
-    // Similar para cash flows...
-
     const portfolioRef = doc(db, 'portfolios', userId);
     await updateDoc(portfolioRef, {
       instruments: updatedInstruments,
@@ -85,24 +70,38 @@ export function usePortfolio(userId) {
     const currentInstruments = portfolio?.instruments || [];
     const existingIndex = currentInstruments.findIndex(inst => inst.name === instrumentData.name);
 
+    // Calcular totalDeposited y totalWithdrawn si no están presentes
+    const cashFlows = instrumentData.cashFlows || [];
+    const totalDeposited = cashFlows
+      .filter(cf => cf.type === 'deposit')
+      .reduce((sum, cf) => sum + (typeof cf.amount === 'number' ? cf.amount : 0), 0);
+    const totalWithdrawn = cashFlows
+      .filter(cf => cf.type === 'withdrawal')
+      .reduce((sum, cf) => sum + (typeof cf.amount === 'number' ? cf.amount : 0), 0);
+
     let updatedInstruments;
 
     if (existingIndex >= 0) {
-      // Actualizar instrumento existente
       const updatedInst = {
         ...currentInstruments[existingIndex],
         ...instrumentData,
+        cashFlows,
+        totalDeposited,
+        totalWithdrawn,
+        netInvested: Math.max(0, totalDeposited - totalWithdrawn),
         currentValue: instrumentData.currentValue ?? currentInstruments[existingIndex].currentValue,
         lastValuationDate: new Date()
       };
       updatedInstruments = [...currentInstruments];
       updatedInstruments[existingIndex] = updatedInst;
     } else {
-      // Crear nuevo instrumento
       const newInstrument = {
         ...instrumentData,
-        cashFlows: instrumentData.cashFlows || [],
+        cashFlows,
         valuations: instrumentData.valuations || [],
+        totalDeposited,
+        totalWithdrawn,
+        netInvested: Math.max(0, totalDeposited - totalWithdrawn),
         currentValue: instrumentData.currentValue || 0,
         lastValuationDate: new Date()
       };
