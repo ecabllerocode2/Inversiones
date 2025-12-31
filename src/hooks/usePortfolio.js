@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react';
 import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase.js';
+import { normalizePortfolio } from '../utils/dateHelpers.js';
 
 export function usePortfolio(userId) {
   const [portfolio, setPortfolio] = useState(null);
@@ -20,7 +21,9 @@ export function usePortfolio(userId) {
         const docSnap = await getDoc(portfolioRef);
 
         if (docSnap.exists()) {
-          setPortfolio(docSnap.data());
+          const rawData = docSnap.data();
+          const normalizedData = normalizePortfolio(rawData);
+          setPortfolio(normalizedData);
         } else {
           const newPortfolio = {
             userId: userId,
@@ -119,34 +122,8 @@ export function usePortfolio(userId) {
       instruments: updatedInstruments,
       updatedAt: new Date()
     }));
-  };
 
-  const addValuation = async (instrumentName, valuation) => {
-    if (!portfolio) throw new Error('Portfolio not loaded');
-    const inst = (portfolio.instruments || []).find(i => i.name === instrumentName);
-    if (!inst) throw new Error('Instrument not found');
-
-    const updatedInstrument = {
-      ...inst,
-      valuations: [...(inst.valuations || []), { id: Date.now().toString(), ...valuation }],
-      currentValue: valuation.value,
-      lastValuationDate: valuation.date
-    };
-
-    await upsertInstrument(updatedInstrument);
-  };
-
-  const addCashFlow = async (instrumentName, cashFlow) => {
-    if (!portfolio) throw new Error('Portfolio not loaded');
-    const inst = (portfolio.instruments || []).find(i => i.name === instrumentName);
-    if (!inst) throw new Error('Instrument not found');
-
-    const updatedInstrument = {
-      ...inst,
-      cashFlows: [...(inst.cashFlows || []), { id: Date.now().toString(), ...cashFlow }]
-    };
-
-    await upsertInstrument(updatedInstrument);
+    return updatedInstruments;
   };
 
   return {
@@ -154,8 +131,7 @@ export function usePortfolio(userId) {
     loading,
     error,
     upsertInstrument,
-    addValuation,
-    addCashFlow,
-    deleteInstrument
+    deleteInstrument,
+    setPortfolio
   };
 }

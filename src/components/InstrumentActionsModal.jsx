@@ -3,12 +3,13 @@ import { useState, useEffect } from 'react';
 import { X, Plus, Edit, Trash2, TrendingUp, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { normalizeDate } from '../utils/dateHelpers.js';
 
 // Helper seguro para formatear fechas
-const safeFormatDate = (dateStr, formatStr = 'dd/MMM/yyyy') => {
-  if (!dateStr) return 'Fecha inválida';
-  const date = new Date(dateStr);
-  if (isNaN(date.getTime())) return 'Fecha inválida';
+const safeFormatDate = (dateInput, formatStr = 'dd/MMM/yyyy') => {
+  if (!dateInput) return 'Fecha inválida';
+  const date = normalizeDate(dateInput);
+  if (!date || isNaN(date.getTime())) return 'Fecha inválida';
   return format(date, formatStr, { locale: es });
 };
 
@@ -76,8 +77,9 @@ export default function InstrumentActionsModal({
     setEditingItem(item);
     setActiveTab(type);
     setShowForm(true);
+    const itemDate = normalizeDate(item.date);
     setFormData({
-      date: item.date ? format(new Date(item.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
+      date: itemDate ? format(itemDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'),
       value: type === 'valuations' ? (item.value || '') : '',
       amount: type === 'cashflows' ? (item.amount || '') : '',
       type: type === 'cashflows' ? (item.type || 'deposit') : 'deposit'
@@ -101,10 +103,18 @@ export default function InstrumentActionsModal({
   };
 
   const sortedValuations = [...(instrument.valuations || [])]
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    .sort((a, b) => {
+      const dateA = normalizeDate(a.date);
+      const dateB = normalizeDate(b.date);
+      return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+    });
 
   const sortedCashFlows = [...(instrument.cashFlows || [])]
-    .sort((a, b) => new Date(b.date) - new Date(a.date));
+    .sort((a, b) => {
+      const dateA = normalizeDate(a.date);
+      const dateB = normalizeDate(b.date);
+      return (dateB?.getTime() || 0) - (dateA?.getTime() || 0);
+    });
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">

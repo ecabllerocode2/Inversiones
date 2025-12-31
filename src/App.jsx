@@ -4,16 +4,16 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './lib/firebase.js';
 import Login from './pages/Login.jsx';
-import Dashboard from './pages/Dashboard.jsx';
+import DashboardV2 from './pages/DashboardV2.jsx';
 import Layout from './components/Layout.jsx';
 
 export default function App() {
-  const [userId, setUserId] = useState(null); // ✅ Solo el uid
+  const [userId, setUserId] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUserId(user ? user.uid : null); // ✅ Extraer solo el uid
+      setUserId(user ? user.uid : null);
       setLoading(false);
     });
 
@@ -21,7 +21,14 @@ export default function App() {
   }, []);
 
   if (loading) {
-    return <div className="min-h-screen flex items-center justify-center">Cargando...</div>;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-16 h-16 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+          <p className="text-gray-600 font-medium">Cargando...</p>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -31,7 +38,7 @@ export default function App() {
         path="/dashboard"
         element={userId ? (
           <Layout>
-            <Dashboard userId={userId} /> {/* ✅ Pasar solo el uid */}
+            <DashboardV2 userId={userId} />
           </Layout>
         ) : (
           <Navigate to="/login" />
